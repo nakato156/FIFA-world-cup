@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.streamlit/
+*.py[cod]
+*.egg-info/
+.coverage
+htmlcov/
+data/raw/
+data/processed/
+artifacts/
+*.keras
+*.joblib
+.env
+kaggle.json
+

@@ -1,0 +1,71 @@
+# Sistema de prediccion e inteligencia deportiva — Mundial 2026
+
+Proyecto académico que integra un predictor MLP/LSTM/GRU, simulación Monte Carlo del formato de 48 selecciones y un dashboard Streamlit en español.
+
+## Instalación local
+
+Requiere Python 3.13, Linux y, opcionalmente, una GPU NVIDIA.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+```
+
+Si TensorFlow no detecta la GPU, el proyecto funciona en CPU. En Linux, la instalación recomendada por TensorFlow es `tensorflow[and-cuda]`; no instale manualmente otra versión de CUDA dentro del entorno.
+
+## Datos y entrenamiento
+
+1. Descargue su token desde Kaggle y defina `KAGGLE_API_TOKEN=...` en `.env`, o guárdelo como `~/.kaggle/access_token`. También se aceptan credenciales legacy en `~/.kaggle/kaggle.json`.
+2. Ejecute el pipeline completo:
+
+```bash
+python scripts/download_data.py
+python scripts/build_dataset.py
+python scripts/train_models.py
+```
+
+Para comprobar la integración con solo dos épocas por modelo:
+
+```bash
+python scripts/train_models.py --quick
+```
+
+Los datos crudos, procesados, credenciales y modelos están excluidos de Git. `data/raw/manifest.json` registra fuente, fecha, tamaño y SHA-256 de cada archivo.
+
+## Dashboard
+
+```bash
+streamlit run app.py
+```
+
+Sin artefactos entrenados, la aplicación arranca en un modo demostración Elo claramente identificado. Después de entrenar, carga automáticamente `artifacts/selected_model.keras` y su bundle de inferencia.
+
+## Notebook y pruebas
+
+El notebook editable es `notebooks/Proyecto_Mundial_2026.ipynb` y la entrega con resultados reales está en `notebooks/Proyecto_Mundial_2026_Ejecutado.ipynb`. En Colab use `requirements-colab.txt`; TensorFlow ya viene incluido en el runtime con GPU.
+
+```bash
+pytest -q
+jupyter lab
+```
+
+## Decisiones y limitaciones
+
+- El test bloqueado es el Mundial 2022; ningún partido de ese torneo entra en entrenamiento o validación.
+- FC 24 funciona como proxy de las plantillas 2026. Las habilidades no aplicables a porteros ignoran valores ausentes.
+- Cuando una selección no tiene plantilla completa se usa la mediana de la edición y se activa `players_imputed`.
+- El desempate implementa puntos, diferencia de gol, goles y enfrentamiento directo. Fair play no está disponible y se reemplaza por un sorteo reproducible.
+- La ronda de 32 conserva los cruces y grupos de terceros permitidos por el calendario FIFA 2026.
+
+## Guion sugerido para el video de dos minutos
+
+- 0:00–0:20: objetivo y modelo seleccionado.
+- 0:20–0:40: predictor entre dos selecciones.
+- 0:40–1:10: editar un grupo y mostrar la tabla recalculada.
+- 1:10–1:35: recorrer el bracket y forzar un ganador.
+- 1:35–1:55: mostrar el top 10 y campeones históricos.
+- 1:55–2:00: cerrar con métricas sobre Mundial 2022.
