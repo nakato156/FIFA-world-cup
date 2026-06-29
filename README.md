@@ -1,6 +1,6 @@
 # Sistema de prediccion e inteligencia deportiva — Mundial 2026
 
-Proyecto académico que integra un predictor MLP/LSTM/GRU, simulación Monte Carlo del formato de 48 selecciones y un dashboard Streamlit en español.
+Proyecto académico que integra MLP/LSTM/GRU con calibración bayesiana y un modelo dinámico Dixon–Coles, simulación Monte Carlo del formato de 48 selecciones y un dashboard Streamlit en español.
 
 ## Instalación local
 
@@ -28,11 +28,15 @@ python scripts/build_dataset.py
 python scripts/train_models.py
 ```
 
+`build_dataset.py --as-of-date YYYY-MM-DD` permite reconstruir un corte histórico sin fuga. El entrenamiento completo ejecuta tres ventanas temporales, ADVI de 50,000 iteraciones y una auditoría NUTS; puede tardar considerablemente.
+
 Para comprobar la integración con solo dos épocas por modelo:
 
 ```bash
 python scripts/train_models.py --quick
 ```
+
+La prueba rápida limita ADVI a 200 pasos y omite NUTS. Para una ejecución personalizada use `--bayes-steps`; `--skip-nuts` queda reservado para diagnóstico, no para el artefacto final.
 
 Los datos crudos, procesados, credenciales y modelos están excluidos de Git. `data/raw/manifest.json` registra fuente, fecha, tamaño y SHA-256 de cada archivo.
 
@@ -42,7 +46,7 @@ Los datos crudos, procesados, credenciales y modelos están excluidos de Git. `d
 streamlit run app.py
 ```
 
-Sin artefactos entrenados, la aplicación arranca en un modo demostración Elo claramente identificado. Después de entrenar, carga automáticamente `artifacts/selected_model.keras` y su bundle de inferencia.
+Sin artefactos v2 entrenados, la aplicación arranca en un modo demostración Elo claramente identificado. Después de entrenar, carga el backbone Keras, calibración posterior, Dixon–Coles y manifiesto versionado.
 
 ## Notebook y pruebas
 
@@ -56,6 +60,9 @@ jupyter lab
 ## Decisiones y limitaciones
 
 - El test bloqueado es el Mundial 2022; ningún partido de ese torneo entra en entrenamiento o validación.
+- El backbone se selecciona por log-loss en tres cortes expansivos; Brier desempata y macro F1 se conserva para la rúbrica.
+- Las probabilidades de resultado proceden del DL calibrado y Dixon–Coles distribuye esa masa entre marcadores coherentes.
+- Cada torneo usa una muestra posterior común; los porcentajes incluyen intervalos Monte Carlo del 95%.
 - FC 24 funciona como proxy de las plantillas 2026. Las habilidades no aplicables a porteros ignoran valores ausentes.
 - Cuando una selección no tiene plantilla completa se usa la mediana de la edición y se activa `players_imputed`.
 - El desempate implementa puntos, diferencia de gol, goles y enfrentamiento directo. Fair play no está disponible y se reemplaza por un sorteo reproducible.

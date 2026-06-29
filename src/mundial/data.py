@@ -41,7 +41,7 @@ def _find_file(root: Path, patterns: tuple[str, ...]) -> Path:
     return sorted(candidates, key=lambda path: (len(path.parts), path.name))[0]
 
 
-def load_results(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
+def load_results(raw_dir: Path = RAW_DIR, as_of_date: str | pd.Timestamp | None = None) -> pd.DataFrame:
     path = _find_file(raw_dir, ("results.csv", "*results*.csv"))
     frame = pd.read_csv(path)
     required = {"date", "home_team", "away_team", "home_score", "away_score"}
@@ -60,6 +60,8 @@ def load_results(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
     frame["tournament"] = frame["tournament"].fillna("Unknown").astype(str)
     frame = frame.dropna(subset=["date", "home_score", "away_score"])
     frame = frame.loc[frame["date"] >= "2015-01-01"].sort_values("date").reset_index(drop=True)
+    if as_of_date is not None:
+        frame = frame.loc[frame["date"] <= pd.Timestamp(as_of_date)].reset_index(drop=True)
     frame["match_id"] = np.arange(len(frame), dtype=np.int64)
     return frame
 
@@ -270,9 +272,14 @@ def build_sequences(matches: pd.DataFrame, history: pd.DataFrame, lookback: int 
     return np.stack(sequence_a), np.stack(sequence_b)
 
 
-def save_processed_dataset(output_dir: Path = PROCESSED_DIR) -> tuple[Path, Path]:
+def save_processed_dataset(
+    output_dir: Path = PROCESSED_DIR,
+    as_of_date: str | pd.Timestamp | None = None,
+) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    matches, seq_a, seq_b = build_match_dataset(load_results(), load_rankings(), build_player_snapshots())
+    matches, seq_a, seq_b = build_match_dataset(
+        load_results(as_of_date=as_of_date), load_rankings(), build_player_snapshots()
+    )
     table_path = output_dir / "matches.parquet"
     sequence_path = output_dir / "sequences.npz"
     matches.to_parquet(table_path, index=False)
@@ -280,6 +287,7 @@ def save_processed_dataset(output_dir: Path = PROCESSED_DIR) -> tuple[Path, Path
     metadata = {
         "rows": len(matches), "static_features": list(STATIC_FEATURES),
         "sequence_features": list(SEQUENCE_FEATURES), "lookback": 10,
+        "as_of_date": None if as_of_date is None else str(pd.Timestamp(as_of_date).date()),
     }
     (output_dir / "dataset_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return table_path, sequence_path

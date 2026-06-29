@@ -40,3 +40,19 @@ def test_final_override_is_respected_with_same_seed():
     assert result.bracket[-1].winner == forced
     assert result.bracket[-1].forced
 
+
+def test_demo_predictions_are_symmetric_and_have_score_matrix():
+    predictor = DemoPredictor({"A": 1700, "B": 1500})
+    forward = predictor.predict_match("A", "B")
+    reverse = predictor.predict_match("B", "A")
+    assert forward.score_probabilities is not None
+    assert forward.prob_a == pytest.approx(reverse.prob_b)
+    assert forward.prob_draw == pytest.approx(reverse.prob_draw)
+    assert forward.expected_goals_a == pytest.approx(reverse.expected_goals_b)
+
+
+def test_simulation_reports_monte_carlo_intervals():
+    result = TournamentSimulator(DemoPredictor()).simulate(load_groups(), runs=100, seed=9)
+    intervals = result.metadata["champion_confidence_intervals_95"]
+    assert set(intervals) == set(result.champion_probabilities)
+    assert all(0.0 <= lower <= upper <= 1.0 for lower, upper in intervals.values())

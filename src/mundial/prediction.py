@@ -6,22 +6,25 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Protocol
+from typing import Mapping, Protocol
 
 from mundial.schemas import MatchPrediction
+from mundial.statistical import align_score_matrix, dixon_coles_matrix
 
 
 class Predictor(Protocol):
-    def predict_match(self, team_a: str, team_b: str) -> MatchPrediction:
+    def predict_match(self, team_a: str, team_b: str, posterior_draw: int | None = None) -> MatchPrediction:
         """Predice un partido en cancha neutral."""
 
 
 class DemoPredictor:
     """Baseline Elo determinista para probar el producto antes de entrenar."""
 
-    def __init__(self, ratings_path: Path | None = None) -> None:
+    def __init__(self, ratings_path: Path | Mapping[str, float] | None = None) -> None:
         self.ratings: dict[str, float] = {}
-        if ratings_path and ratings_path.exists():
+        if isinstance(ratings_path, Mapping):
+            self.ratings = {team: float(value) for team, value in ratings_path.items()}
+        elif ratings_path and ratings_path.exists():
             self.ratings = json.loads(ratings_path.read_text(encoding="utf-8"))
 
     @staticmethod
@@ -29,7 +32,7 @@ class DemoPredictor:
         digest = hashlib.sha256(team.encode("utf-8")).hexdigest()
         return 1450.0 + (int(digest[:8], 16) % 350)
 
-    def predict_match(self, team_a: str, team_b: str) -> MatchPrediction:
+    def predict_match(self, team_a: str, team_b: str, posterior_draw: int | None = None) -> MatchPrediction:
         if team_a == team_b:
             raise ValueError("Una seleccion no puede jugar contra si misma")
         rating_a = float(self.ratings.get(team_a, self._stable_rating(team_a)))
@@ -40,14 +43,6 @@ class DemoPredictor:
         prob_b = (1.0 - draw) * (1.0 - strength_a)
         goals_a = max(0.2, 0.55 + 1.75 * strength_a)
         goals_b = max(0.2, 0.55 + 1.75 * (1.0 - strength_a))
-        return MatchPrediction(
-            team_a=team_a,
-            team_b=team_b,
-            prob_a=prob_a,
-            prob_draw=draw,
-            prob_b=prob_b,
-            expected_goals_a=goals_a,
-            expected_goals_b=goals_b,
-            likely_score=(round(goals_a), round(goals_b)),
-        )
-
+        matrix, _ = dixon_coles_matrix(goals_a, goals_b)
+        matrix = align_score_matrix(matrix, (prob_a, draw, prob_b))
+        return MatchPrediction.from_score_matrix(team_a, team_b, matrix)

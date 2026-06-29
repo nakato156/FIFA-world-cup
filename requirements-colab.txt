@@ -7,3 +7,4 @@ kaggle==1.7.4.5
 kagglehub==1.0.2
 pyarrow==22.0.0
 matplotlib==3.10.8
+pymc==6.0.1

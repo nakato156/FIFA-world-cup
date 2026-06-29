@@ -66,7 +66,9 @@ with predictor_tab:
 
 with st.sidebar:
     st.header("Configuracion")
-    runs = st.select_slider("Simulaciones", options=[100, 250, 500, 1_000, 2_000], value=2_000)
+    runs = st.select_slider(
+        "Simulaciones", options=[100, 250, 500, 1_000, 2_000, 10_000, 20_000], value=2_000
+    )
     seed = st.number_input("Semilla", min_value=1, value=2026, step=1)
     st.caption("Mas simulaciones producen porcentajes mas estables.")
 
@@ -149,7 +151,15 @@ with champions_tab:
         st.warning("Corrija la configuracion de grupos para calcular campeones.")
     else:
         top = list(simulation.champion_probabilities.items())[:10]
-        chart = pd.DataFrame(top, columns=["Seleccion", "Probabilidad"])
+        intervals = simulation.metadata.get("champion_confidence_intervals_95", {})
+        chart = pd.DataFrame([
+            {
+                "Seleccion": team, "Probabilidad": probability,
+                "IC inferior": intervals.get(team, (probability, probability))[0],
+                "IC superior": intervals.get(team, (probability, probability))[1],
+            }
+            for team, probability in top
+        ])
         figure = px.bar(
             chart.sort_values("Probabilidad"), x="Probabilidad", y="Seleccion", orientation="h",
             text=chart.sort_values("Probabilidad")["Probabilidad"].map(lambda value: f"{value:.1%}"),
@@ -158,6 +168,17 @@ with champions_tab:
         figure.update_xaxes(tickformat=".0%")
         figure.update_layout(showlegend=False)
         st.plotly_chart(figure, width="stretch")
+        st.dataframe(
+            chart.assign(
+                Probabilidad=chart["Probabilidad"].map(lambda value: f"{value:.2%}"),
+                **{
+                    "IC 95%": chart.apply(
+                        lambda row: f"{row['IC inferior']:.2%} – {row['IC superior']:.2%}", axis=1
+                    )
+                },
+            )[["Seleccion", "Probabilidad", "IC 95%"]],
+            hide_index=True, width="stretch",
+        )
         titles, source = load_world_cup_titles()
         context = pd.DataFrame(
             [{"Seleccion": team, "Titulos mundiales": titles.get(team, 0)} for team, _ in top]
